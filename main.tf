@@ -5,7 +5,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0" # Ensure this matches or is compatible with the caller's requirement
+      version = "~> 3.117.0" # <-- UPDATED: Ensure this version supports the NGFW resource
     }
   }
 }
@@ -140,22 +140,19 @@ resource "azurerm_public_ip" "ngfw_public_ip_egress" {
 # --- Palo Alto Networks Cloud NGFW Resource (CORRECTED TYPE) ---
 # This resource provisions the Cloud NGFW service attached to a VNet
 # and managed via Azure Rulestack.
-resource "azurerm_palo_alto_next_generation_firewall_local_rulestack" "ngfw" { # <-- CORRECTED RESOURCE TYPE
+resource "azurerm_palo_alto_next_generation_firewall_local_rulestack" "ngfw" {
   name                = var.firewall_name
   location            = azurerm_resource_group.ngfw_rg.location
   resource_group_name = azurerm_resource_group.ngfw_rg.name
   tags                = var.tags
 
   # Network profile configuration for the NGFW interfaces.
-  # Note the different structure compared to the previous, incorrect resource type.
   network_profile {
-    # Public IP addresses assigned to the NGFW for external connectivity.
     public_ip_address_ids = [
       azurerm_public_ip.ngfw_public_ip_ingress.id,
       azurerm_public_ip.ngfw_public_ip_egress.id,
     ]
 
-    # Virtual Network configuration for the NGFW's internal interfaces.
     vnet_configuration {
       virtual_network_id  = azurerm_virtual_network.ngfw_vnet.id
       trusted_subnet_id   = azurerm_subnet.trusted_subnet.id
@@ -164,32 +161,22 @@ resource "azurerm_palo_alto_next_generation_firewall_local_rulestack" "ngfw" { #
   }
 
   # Local Rulestack Configuration (Mandatory for CloudManaged NGFW via Azure Rulestack)
-  # This block configures the integrated Azure Rulestack for policy management.
   local_rulestack {
     name       = "${var.firewall_name}-rulestack"
     location   = azurerm_resource_group.ngfw_rg.location
-    # min_engine_version is often required, check latest Palo Alto docs
     min_engine_version = "9.0.0" # Example, update based on current requirements
 
-    # Security services within the rulestack (example placeholders)
     security_services {
       anti_spyware_profile_name = "default"
       anti_virus_profile_name   = "default"
       url_filtering_profile_name = "default"
       file_blocking_profile_name = "default"
       dns_security_profile_name = "default"
-      # Add other security services as required by Palo Alto documentation.
     }
   }
-
-  # Other optional configuration blocks can be added here if needed,
-  # e.g., `destination_nat`, `egress_nat`, `dns_settings`, `diagnostics`.
-  # Refer to the azurerm_palo_alto_next_generation_firewall_local_rulestack documentation for full options.
 }
 
 # --- Outputs from THIS Module (AzureCloudNGFW) ---
-# These outputs expose values from the deployed NGFW.
-
 output "cloud_ngfw_name" {
   description = "The name of the deployed Cloud NGFW instance."
   value       = azurerm_palo_alto_next_generation_firewall_local_rulestack.ngfw.name
