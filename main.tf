@@ -1,8 +1,7 @@
-# This OpenTofu configuration calls the Cloud NGFW deployment script
-# as a module directly from a GitHub repository.
+# main.tf for github.com/rhernand1/my-ngfw-caller (this is the module)
 
 # --- Provider Configuration ---
-# Specifies the required AzureRM provider, as it's used by the called module.
+# Specifies the required AzureRM provider for this module.
 terraform {
   required_providers {
     azurerm = {
@@ -12,49 +11,113 @@ terraform {
   }
 }
 
-# Configures the AzureRM provider for the root module.
+# Configures the AzureRM provider for this module.
 provider "azurerm" {
   features {}
 }
 
-# --- Module Call ---
-# This block references the Cloud NGFW configuration located in your GitHub repository.
-# Replace 'your-username/your-ngfw-repo' with your actual GitHub username and repository name.
-# The 'ref' argument specifies the branch, tag, or commit hash to use.
-module "cloud_ngfw_instance" {
-  source = "github.com/rhernand1/AzureCloudNGFW?ref=main" # <--- IMPORTANT: Replace with your actual repo and branch/tag
+# --- Input Variables for THIS Module ---
+# These variables define the inputs that this 'my-ngfw-caller' module accepts
+# from its parent configuration (your local 'my-ngfw-project-caller/main.tf').
 
-  # --- Pass Variables to the Module ---
-  # All variables defined in the original `ngfw-standalone-deployment` script
-  # (which is now acting as your module) must be passed as arguments here.
-  # These values will override the defaults set in the module's variables.
-
-  resource_group_name    = "RHTESTING-GitHub" # <--- CHANGE: Example: changed RG name to differentiate
-  location               = "East US 2"
-  firewall_name          = "cngfwrh-github" # <--- CHANGE: Example: changed firewall name
-  vnet_name              = "ngfw-vnet-github"
-  vnet_address_space     = ["10.20.0.0/16"] # <--- CHANGE: Example: changed VNet address space
-  untrusted_subnet_name  = "github-untrusted"
-  untrusted_subnet_prefix = "10.20.0.0/28"
-  trusted_subnet_name    = "github-trusted"
-  trusted_subnet_prefix  = "10.20.0.16/28"
-  management_subnet_name = "github-mgmt"
-  management_subnet_prefix = "10.20.0.32/28"
-  tags = {
-    Environment = "GitHub_Deployed"
-    Project     = "CloudNGFWGitHubDemo"
-    DeployedBy  = "OpenTofu"
-  }
+variable "resource_group_name" {
+  description = "The name of the Azure Resource Group for the Cloud NGFW."
+  type        = string
 }
 
-# --- Outputs (Optional) ---
-# You can define outputs here to expose values from the called module.
-output "deployed_ngfw_name" {
-  description = "The name of the Cloud NGFW deployed via the GitHub module."
-  value       = module.cloud_ngfw_instance.cloud_ngfw_name
+variable "location" {
+  description = "The Azure region where resources will be deployed."
+  type        = string
 }
 
-output "deployed_ngfw_ingress_ip" {
-  description = "The ingress public IP of the Cloud NGFW deployed via the GitHub module."
-  value       = module.cloud_ngfw_instance.cloud_ngfw_public_ip_ingress
+variable "firewall_name" {
+  description = "The name of the Palo Alto Networks Cloud NGFW instance."
+  type        = string
+}
+
+variable "vnet_name" {
+  description = "The name of the Virtual Network (VNet) for the NGFW interfaces."
+  type        = string
+}
+
+variable "vnet_address_space" {
+  description = "The address space (CIDR) for the VNet."
+  type        = list(string)
+}
+
+variable "untrusted_subnet_name" {
+  description = "The name of the untrusted subnet for the NGFW interface."
+  type        = string
+}
+
+variable "untrusted_subnet_prefix" {
+  description = "The address prefix (CIDR) for the untrusted subnet."
+  type        = string
+}
+
+variable "trusted_subnet_name" {
+  description = "The name of the trusted subnet for the NGFW interface."
+  type        = string
+}
+
+variable "trusted_subnet_prefix" {
+  description = "The address prefix (CIDR) for the trusted subnet."
+  type        = string
+}
+
+variable "management_subnet_name" {
+  description = "The name of the management subnet for the NGFW interface (optional)."
+  type        = string
+}
+
+variable "management_subnet_prefix" {
+  description = "The address prefix (CIDR) for the management subnet (optional)."
+  type        = string
+}
+
+variable "tags" {
+  description = "A map of tags to apply to all deployed resources."
+  type        = map(string)
+}
+
+
+# --- Module Call (to AzureCloudNGFW) ---
+# This module calls the actual Cloud NGFW definition from your AzureCloudNGFW repository.
+# It passes down the variables that THIS module received as inputs.
+module "cloud_ngfw_deployment" { # Renamed to avoid confusion with the caller's instance name
+  source = "github.com/rhernand1/AzureCloudNGFW?ref=main" # This remains the same
+
+  # --- Pass Variables DOWN to the AzureCloudNGFW Module ---
+  # These are the variables that the AzureCloudNGFW module (the actual NGFW script) expects.
+  # We are now passing the values received by *this* module (my-ngfw-caller) down to it.
+  resource_group_name    = var.resource_group_name
+  location               = var.location
+  firewall_name          = var.firewall_name
+  vnet_name              = var.vnet_name
+  vnet_address_space     = var.vnet_address_space
+  untrusted_subnet_name  = var.untrusted_subnet_name
+  untrusted_subnet_prefix = var.untrusted_subnet_prefix
+  trusted_subnet_name    = var.trusted_subnet_name
+  trusted_subnet_prefix  = var.trusted_subnet_prefix
+  management_subnet_name = var.management_subnet_name
+  management_subnet_prefix = var.management_subnet_prefix
+  tags                   = var.tags
+}
+
+# --- Outputs from THIS Module ---
+# These outputs expose values from the 'cloud_ngfw_deployment' module (AzureCloudNGFW)
+# so that the parent configuration (your local 'main.tf') can access them.
+output "cloud_ngfw_name" {
+  description = "The name of the Cloud NGFW deployed by this module."
+  value       = module.cloud_ngfw_deployment.cloud_ngfw_name # Accessing output from the nested module
+}
+
+output "cloud_ngfw_ingress_ip" {
+  description = "The ingress public IP of the Cloud NGFW deployed by this module."
+  value       = module.cloud_ngfw_deployment.cloud_ngfw_public_ip_ingress # Accessing output
+}
+
+output "cloud_ngfw_egress_ip" {
+  description = "The egress public IP of the Cloud NGFW deployed by this module."
+  value       = module.cloud_ngfw_deployment.cloud_ngfw_public_ip_egress # Accessing output
 }
