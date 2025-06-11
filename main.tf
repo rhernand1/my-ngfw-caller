@@ -22,7 +22,7 @@ provider "azurerm" {
 # Replace 'your-username/your-ngfw-repo' with your actual GitHub username and repository name.
 # The 'ref' argument specifies the branch, tag, or commit hash to use.
 module "cloud_ngfw_instance" {
-  source = "github.com/your-username/your-ngfw-repo?ref=main" # <--- IMPORTANT: Replace with your actual repo and branch/tag
+  source = "github.com/rhernand1/AzureCloudNGFW?ref=main" # <--- IMPORTANT: Replace with your actual repo and branch/tag
 
   # --- Pass Variables to the Module ---
   # All variables defined in the original `ngfw-standalone-deployment` script
