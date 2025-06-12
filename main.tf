@@ -5,7 +5,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.117.0" # Make sure this is updated!
+      version = "3.117.1" # <-- FORCED TO SPECIFIC VERSION
     }
   }
 }
@@ -78,7 +78,7 @@ variable "tags" {
 
 # --- Module Call (to AzureCloudNGFW) ---
 module "cloud_ngfw_deployment" {
-  source = "github.com/rhernand1/AzureCloudNGFW?ref=main" # This remains the same
+  source = "github.com/rhernand1/AzureCloudNGFW?ref=main"
 
   resource_group_name    = var.resource_group_name
   location               = var.location
@@ -100,12 +100,12 @@ output "cloud_ngfw_name" {
   value       = module.cloud_ngfw_deployment.cloud_ngfw_name
 }
 
-output "cloud_ngfw_ingress_ip" { # <-- Explicitly defined output
+output "cloud_ngfw_ingress_ip" {
   description = "The ingress public IP of the Cloud NGFW deployed by this module."
   value       = module.cloud_ngfw_deployment.cloud_ngfw_public_ip_ingress
 }
 
-output "cloud_ngfw_egress_ip" { # <-- Explicitly defined output
+output "cloud_ngfw_egress_ip" {
   description = "The egress public IP of the Cloud NGFW deployed by this module."
   value       = module.cloud_ngfw_deployment.cloud_ngfw_public_ip_egress
 }
