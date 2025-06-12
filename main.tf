@@ -1,11 +1,11 @@
-# main.tf for github.com/rhernand1/AzureCloudNGFW (this is the actual NGFW module)
+# main.tf for github.com/rhernand1/my-ngfw-caller (This is the intermediate module)
 
 # --- Provider Configuration ---
 terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.117.0" # <-- UPDATED: Ensure this version supports the NGFW resource
+      version = "~> 3.117.0" # Make sure this is updated!
     }
   }
 }
@@ -14,10 +14,7 @@ provider "azurerm" {
   features {}
 }
 
-# --- Input Variables for THIS Module (AzureCloudNGFW) ---
-# These variables define the inputs that this module expects to receive
-# from the 'my-ngfw-caller' module.
-
+# --- Input Variables for THIS Module (my-ngfw-caller) ---
 variable "resource_group_name" {
   description = "The name of the Azure Resource Group for the Cloud NGFW."
   type        = string
@@ -78,132 +75,37 @@ variable "tags" {
   type        = map(string)
 }
 
-# --- Azure Resource Group ---
-resource "azurerm_resource_group" "ngfw_rg" {
-  name     = var.resource_group_name
-  location = var.location
-  tags     = var.tags
+
+# --- Module Call (to AzureCloudNGFW) ---
+module "cloud_ngfw_deployment" {
+  source = "github.com/rhernand1/AzureCloudNGFW?ref=main" # This remains the same
+
+  resource_group_name    = var.resource_group_name
+  location               = var.location
+  firewall_name          = var.firewall_name
+  vnet_name              = var.vnet_name
+  vnet_address_space     = var.vnet_address_space
+  untrusted_subnet_name  = var.untrusted_subnet_name
+  untrusted_subnet_prefix = var.untrusted_subnet_prefix
+  trusted_subnet_name    = var.trusted_subnet_name
+  trusted_subnet_prefix  = var.trusted_subnet_prefix
+  management_subnet_name = var.management_subnet_name
+  management_subnet_prefix = var.management_subnet_prefix
+  tags                   = var.tags
 }
 
-# --- Virtual Network (VNet) ---
-resource "azurerm_virtual_network" "ngfw_vnet" {
-  name                = var.vnet_name
-  location            = azurerm_resource_group.ngfw_rg.location
-  resource_group_name = azurerm_resource_group.ngfw_rg.name
-  address_space       = var.vnet_address_space
-  tags                = var.tags
-}
-
-# --- Subnets for NGFW Interfaces ---
-resource "azurerm_subnet" "untrusted_subnet" {
-  name                 = var.untrusted_subnet_name
-  resource_group_name  = azurerm_resource_group.ngfw_rg.name
-  virtual_network_name = azurerm_virtual_network.ngfw_vnet.name
-  address_prefixes     = [var.untrusted_subnet_prefix]
-  service_endpoints    = ["Microsoft.Storage", "Microsoft.KeyVault"]
-}
-
-resource "azurerm_subnet" "trusted_subnet" {
-  name                 = var.trusted_subnet_name
-  resource_group_name  = azurerm_resource_group.ngfw_rg.name
-  virtual_network_name = azurerm_virtual_network.ngfw_vnet.name
-  address_prefixes     = [var.trusted_subnet_prefix]
-  service_endpoints    = ["Microsoft.Storage", "Microsoft.KeyVault"]
-}
-
-resource "azurerm_subnet" "management_subnet" {
-  name                 = var.management_subnet_name
-  resource_group_name  = azurerm_resource_group.ngfw_rg.name
-  virtual_network_name = azurerm_virtual_network.ngfw_vnet.name
-  address_prefixes     = [var.management_subnet_prefix]
-}
-
-# --- Public IP Addresses for NGFW Frontend ---
-resource "azurerm_public_ip" "ngfw_public_ip_ingress" {
-  name                = "${var.firewall_name}-pip-ingress"
-  location            = azurerm_resource_group.ngfw_rg.location
-  resource_group_name = azurerm_resource_group.ngfw_rg.name
-  allocation_method   = "Static"
-  sku                 = "Standard"
-  tags                = var.tags
-}
-
-resource "azurerm_public_ip" "ngfw_public_ip_egress" {
-  name                = "${var.firewall_name}-pip-egress"
-  location            = azurerm_resource_group.ngfw_rg.location
-  resource_group_name = azurerm_resource_group.ngfw_rg.name
-  allocation_method   = "Static"
-  sku                 = "Standard"
-  tags                = var.tags
-}
-
-# --- Palo Alto Networks Cloud NGFW Resource (CORRECTED TYPE) ---
-# This resource provisions the Cloud NGFW service attached to a VNet
-# and managed via Azure Rulestack.
-resource "azurerm_palo_alto_next_generation_firewall_local_rulestack" "ngfw" {
-  name                = var.firewall_name
-  location            = azurerm_resource_group.ngfw_rg.location
-  resource_group_name = azurerm_resource_group.ngfw_rg.name
-  tags                = var.tags
-
-  # Network profile configuration for the NGFW interfaces.
-  network_profile {
-    public_ip_address_ids = [
-      azurerm_public_ip.ngfw_public_ip_ingress.id,
-      azurerm_public_ip.ngfw_public_ip_egress.id,
-    ]
-
-    vnet_configuration {
-      virtual_network_id  = azurerm_virtual_network.ngfw_vnet.id
-      trusted_subnet_id   = azurerm_subnet.trusted_subnet.id
-      untrusted_subnet_id = azurerm_subnet.untrusted_subnet.id
-    }
-  }
-
-  # Local Rulestack Configuration (Mandatory for CloudManaged NGFW via Azure Rulestack)
-  local_rulestack {
-    name       = "${var.firewall_name}-rulestack"
-    location   = azurerm_resource_group.ngfw_rg.location
-    min_engine_version = "9.0.0" # Example, update based on current requirements
-
-    security_services {
-      anti_spyware_profile_name = "default"
-      anti_virus_profile_name   = "default"
-      url_filtering_profile_name = "default"
-      file_blocking_profile_name = "default"
-      dns_security_profile_name = "default"
-    }
-  }
-}
-
-# --- Outputs from THIS Module (AzureCloudNGFW) ---
+# --- Outputs from THIS Module (my-ngfw-caller) ---
 output "cloud_ngfw_name" {
-  description = "The name of the deployed Cloud NGFW instance."
-  value       = azurerm_palo_alto_next_generation_firewall_local_rulestack.ngfw.name
+  description = "The name of the Cloud NGFW deployed by this module."
+  value       = module.cloud_ngfw_deployment.cloud_ngfw_name
 }
 
-output "cloud_ngfw_public_ip_ingress" {
-  description = "The Public IP address for ingress traffic to the Cloud NGFW."
-  value       = azurerm_public_ip.ngfw_public_ip_ingress.ip_address
+output "cloud_ngfw_ingress_ip" { # <-- Explicitly defined output
+  description = "The ingress public IP of the Cloud NGFW deployed by this module."
+  value       = module.cloud_ngfw_deployment.cloud_ngfw_public_ip_ingress
 }
 
-output "cloud_ngfw_public_ip_egress" {
-  description = "The Public IP address for egress traffic from the Cloud NGFW."
-  value       = azurerm_public_ip.ngfw_public_ip_egress.ip_address
+output "cloud_ngfw_egress_ip" { # <-- Explicitly defined output
+  description = "The egress public IP of the Cloud NGFW deployed by this module."
+  value       = module.cloud_ngfw_deployment.cloud_ngfw_public_ip_egress
 }
-
-output "ngfw_vnet_id" {
-  description = "The ID of the Virtual Network where the NGFW interfaces are located."
-  value       = azurerm_virtual_network.ngfw_vnet.id
-}
-
-output "ngfw_untrusted_subnet_id" {
-  description = "The ID of the untrusted subnet connected to the NGFW."
-  value       = azurerm_subnet.untrusted_subnet.id
-}
-
-output "ngfw_trusted_subnet_id" {
-  description = "The ID of the trusted subnet connected to the NGFW."
-  value       = azurerm_subnet.trusted_subnet.id
-}
-
