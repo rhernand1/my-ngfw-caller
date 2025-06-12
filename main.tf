@@ -5,7 +5,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.30.0" # <-- UPDATED: Align with 4.x.x provider
+      version = "~> 4.30.0"
     }
   }
 }
@@ -15,6 +15,11 @@ provider "azurerm" {
 }
 
 # --- Input Variables for THIS Module (my-ngfw-caller) ---
+variable "subscription_id" { # <-- NEW: Subscription ID variable
+  description = "The Azure Subscription ID to deploy resources into."
+  type        = string
+}
+
 variable "resource_group_name" {
   description = "The name of the Azure Resource Group for the Cloud NGFW."
   type        = string
@@ -80,6 +85,7 @@ variable "tags" {
 module "cloud_ngfw_deployment" {
   source = "github.com/rhernand1/AzureCloudNGFW?ref=main"
 
+  subscription_id        = var.subscription_id # <-- NEW: Pass subscription_id
   resource_group_name    = var.resource_group_name
   location               = var.location
   firewall_name          = var.firewall_name
