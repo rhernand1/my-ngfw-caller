@@ -13,6 +13,7 @@ terraform {
 provider "azurerm" {
   features {}
   # This provider block will implicitly pass its subscription context to the nested module.
+  # The subscription_id will be derived from the parent provider (your local root).
 }
 
 # --- Input Variables for THIS Module (my-ngfw-caller) ---
