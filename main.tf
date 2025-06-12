@@ -15,7 +15,7 @@ provider "azurerm" {
 }
 
 # --- Input Variables for THIS Module (my-ngfw-caller) ---
-variable "subscription_id" { # Keep this variable here, as the parent passes it to *this* module
+variable "subscription_id" {
   description = "The Azure Subscription ID to deploy resources into."
   type        = string
 }
@@ -85,8 +85,7 @@ variable "tags" {
 module "cloud_ngfw_deployment" {
   source = "github.com/rhernand1/AzureCloudNGFW?ref=main"
 
-  # Removed 'subscription_id' here. The nested module's provider will
-  # pick up the subscription from the parent's provider configuration.
+  subscription_id        = var.subscription_id # <-- CRITICAL: Pass subscription_id down to nested module
   resource_group_name    = var.resource_group_name
   location               = var.location
   firewall_name          = var.firewall_name
