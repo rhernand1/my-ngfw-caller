@@ -12,7 +12,7 @@ terraform {
 
 provider "azurerm" {
   features {}
-  subscription_id = var.subscription_id # <-- CRITICAL: Configure provider with subscription_id
+  # This provider block will implicitly pass its subscription context to the nested module.
 }
 
 # --- Input Variables for THIS Module (my-ngfw-caller) ---
@@ -86,7 +86,7 @@ variable "tags" {
 module "cloud_ngfw_deployment" {
   source = "github.com/rhernand1/AzureCloudNGFW?ref=main"
 
-  # The 'providers' meta-argument is still here to pass the already-configured
+  # The 'providers' meta-argument is here to pass the already-configured
   # provider from *this* module down to the nested 'AzureCloudNGFW' module.
   providers = {
     azurerm = azurerm
