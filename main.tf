@@ -10,12 +10,14 @@ terraform {
   }
 }
 
+# This provider block will be configured by the parent module (your local root)
+# and its configuration will be passed down to nested modules via the 'providers' meta-argument.
 provider "azurerm" {
   features {}
 }
 
 # --- Input Variables for THIS Module (my-ngfw-caller) ---
-variable "subscription_id" {
+variable "subscription_id" { # This variable still accepts input from the local root caller
   description = "The Azure Subscription ID to deploy resources into."
   type        = string
 }
@@ -85,7 +87,14 @@ variable "tags" {
 module "cloud_ngfw_deployment" {
   source = "github.com/rhernand1/AzureCloudNGFW?ref=main"
 
-  subscription_id        = var.subscription_id # <-- CRITICAL: Pass subscription_id down to nested module
+  # Pass provider configuration to the nested module.
+  # This maps the 'azurerm' provider within this module to the 'azurerm'
+  # provider of the 'AzureCloudNGFW' module, effectively passing the subscription_id.
+  providers = {
+    azurerm = azurerm # This links the provider from the calling module (my-ngfw-caller)
+                      # to the called module (AzureCloudNGFW).
+  }
+
   resource_group_name    = var.resource_group_name
   location               = var.location
   firewall_name          = var.firewall_name
